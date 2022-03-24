@@ -1,6 +1,6 @@
 # Parallel Lossless Compressors
 
-Huilin Xiong (hxing)
+Huilin Xiong (hxiong)
 
 Qier Li (qierl)
 
@@ -20,7 +20,7 @@ LZ77 and Huffman Coding, the two specific algorithm the project would start from
 
 #### File Size versus Partition Number
 
-One common and widely-used way to parallelize is partition the file into several chunks, compress each and combine the compressed one together. Obviously this high-level parallelism might leads to a lower compression ratio, especially when some patterns happen across the boundary of chunks so that it would fail to be detected in LZ77 algorithms. As the number of cores increases (e.g., up to 128), the ratio would be extremly compromised.
+One common and widely-used way to parallelize is to partition the file into several chunks, compress each and combine the compressed one together. Obviously this high-level parallelism might leads to a lower compression ratio, especially when some patterns happen across the boundary of chunks so that it would fail to be detected in LZ77 algorithms. As the number of cores increases (e.g., up to 128), the ratio would be extremly compromised.
 
 #### Communication Cost when Parallelizing Huffman Coding
 
@@ -52,7 +52,7 @@ Research papers and open-sourced projects of modern compressor would be refered 
 
 ##### Hope to Achieve
 
-1. Futher development of the alogrithms based on industrial implementations such as Facebook's zstd and LZ4. Push the performance to the limit (e.g., compare our implementations to pzstd the official simple implementation of parallel zstd).
+1. Further development of the alogrithms based on industrial implementations such as Facebook's zstd and LZ4. Push the performance to the limit (e.g., compare our implementations to pzstd the official simple implementation of parallel zstd).
 2. GPU implementation, and probably the analysis showing why GPU doesn't suit for compression problem.
 
 ##### Compromised goal when goes slow
