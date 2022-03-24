@@ -34,7 +34,7 @@ If the logics of the parallel implementation differs from the sequential one, or
 
 #### Machine Resources
 
-Development would be on laptops, while test would be on GHC machines and bridge machines, for a regular multi-core machine case and an extremely multi-core machine case respectively. GPUs are not in the plan because it's not suitable for the compression.
+Development would be on laptops, while test would be on GHC machines and PSC bridge machines, for a regular multi-core machine case and an extreme multi-core machine case respectively. GPUs are not in the plan because it's not suitable for the compression.
 
 #### Reference
 
@@ -43,19 +43,33 @@ Research papers and open-sourced projects of modern compressor would be refered 
 
 ## Goals and Deliverables
 
-#### Plan to Achieve
-1. Sequential implementation of Huffman encoding and Lempel-Ziv compression.
-2. Parallelizing Huffman encoding and Lempel-Ziv compression.
+##### Plan to Achieve
+
+1. Sequential implementation of Huffman encoding and LZ77 compression.
+2. Parallel versions of these 2 implementations.
 3. Performance benchmarks and comparison. The project aims to provide linear speedup of throughput over number of cores and the similar compress ratio with the sequential one.
 4. Tuning for different machines and different workflows.
 
-#### Hope to Achieve
+##### Hope to Achieve
+
 1. Futher development of the alogrithms based on industrial implementations such as Facebook's zstd and LZ4. Push the performance to the limit (e.g., compare our implementations to pzstd the official simple implementation of parallel zstd).
-2. GPU implementation and probably the analysis showing why GPU doesn't suit for compression problem.
+2. GPU implementation, and probably the analysis showing why GPU doesn't suit for compression problem.
+
+##### Compromised goal when goes slow
+
+One correct parallel version of Huffman or LZ77 with reasonable performance.
 
 ## Platform Choice
 
-
+The compression algorithms would be implemented in C for performance. Tests would be conducted on GHC machines and PSC bridge machines, which represents regular and extreme multi-core machines.
 
 ## Schedule
+
+| Time                               | Milestone                                                    |
+| ---------------------------------- | ------------------------------------------------------------ |
+| Week 1 03/25~04/04                 | Background research and paper reading. Understand algorithms. |
+| Week  2 04/04~04/11 (Checkpoint)   | Sequential implementation of Huffman encoding and LZ77 compression. |
+| Week  3 04/11~04/18                | Parallielizing Huffman encoding and LZ77 compression.        |
+| Week  4 04/18~04/25                | Benchmarks, tuning and analysis.                             |
+| Week  5 04/25~04/29 (Final Report) | Further analysis, improvement and prepare for the final report. |
 
