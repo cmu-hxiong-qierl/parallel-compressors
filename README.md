@@ -42,18 +42,18 @@ Research papers and open-sourced projects of modern compressor would be refered 
 
 ## Goals and Deliverables
 
-##### Plan to Achieve
+#### Plan to Achieve
 
 1. Sequential implementations of Huffman encoding and LZ77 compression.
 2. Parallel versions of these 2 implementations.
 3. Performance benchmark and comparison. The project aims to provide a linear speedup of throughput over the number of cores, and a similar compression ratio with the sequential one.
 4. Tuning for different machines and different workflows.
 
-##### Hope to Achieve
+#### Hope to Achieve
 1. Futher development of the alogrithms based on industrial implementations such as Facebook's zstd and LZ4. Push the performance to the limit (e.g., compare our implementations to pzstd, the official simple implementation of parallel zstd).
 2. GPU implementation, and probably the analysis showing why GPU doesn't suit for compression problem.
 
-##### Compromised goal when work goes slow
+#### Compromised goal when work goes slow
 
 One correct parallel version of Huffman or LZ77 with reasonable performance.
 
