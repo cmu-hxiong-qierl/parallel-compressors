@@ -22,13 +22,14 @@ typedef std::chrono::duration<double> dsec;
 
 struct hnode
 {
-    char character;
+    int id;// char id in ascii
     int freq;
     hnode *left;
     hnode *right;
     hnode(){
         left = nullptr;
         right = nullptr;
+        freq = 0;
     }
 };
 
@@ -36,8 +37,13 @@ class HuffmanCompressor{
 private:
     char* input_filepath;
     char* output_filepath;
+    char* map_filepath;
     uint32_t rawdata_size;
     unsigned char* rawdata_buffer;
+
+    uint32_t encoded_bytesize;
+    uint32_t encoded_bitsize;
+    unsigned char* encoded_data_buffer;
     hnode* hnode_array[CHAR_NUM];
     int threads_num = 0;
 
@@ -47,24 +53,24 @@ private:
         }
     };
     priority_queue<hnode*,vector<hnode*>,compare> pq;
-    unordered_map<unsigned char, huffmanBitSet> char_code_map;
-    map<char, string> char_strcode_map;
-//    map<char, int> char_freq_map;
+    unordered_map<int, huffmanBitSet> char_code_map;
+    map<int, string> char_strcode_map;
     uint32_t all_freq[CHAR_NUM] = {0};
-
 
 
 public:
     void set_thread_num(int thread_num){
         threads_num = thread_num;
     }
-    void set_filepath(char* input, char* output);
+    void set_filepath(char* input, char* output, char* mapfilepath);
 
     void read_raw_file(char* filepath);
 
     void init_hnode_array();
 
     void output_encoded_file();
+
+    void output_encode_map();
 
     void build_huffman_tree();
 
@@ -76,24 +82,73 @@ public:
 
     void get_encoded_file();
 
-    int get_local_output_bitsize(uint32_t start_off, uint32_t end_off);
+    void get_decoded_file();
 
+    void read_encode_map();
+
+    void read_encoded_file();
+
+    void decode();
+
+    void output_decoded_file();
+
+    int get_local_output_bitsize(uint32_t start_off, uint32_t end_off);
 };
 
-void HuffmanCompressor::set_filepath(char* input, char* output){
+void HuffmanCompressor::set_filepath(char* input, char* output, char* mapfilepath){
     input_filepath = input;
     output_filepath = output;
+    map_filepath = mapfilepath;
     rawdata_size = 0;
 }
 
 /**
+ * @brief read the map file and fill all_freq[], and rawdata_size
+ * @param filepath
+ */
+void HuffmanCompressor::read_encode_map(){
+    // the first line is the rawdata_size
+    cout<<"read_encode_map"<<endl;
+    char line_ca[32];
+    FILE *mapfile = fopen(map_filepath,"r");
+
+    fscanf(mapfile,"%s",line_ca);
+    rawdata_size = stoi(string(line_ca));
+    cout<<"rawdata_size="<<rawdata_size<<endl;
+
+    fscanf(mapfile,"%s",line_ca);
+    encoded_bytesize = stoi(string(line_ca));
+    cout<<"encoded_bytesize="<<encoded_bytesize<<endl;
+
+    fscanf(mapfile,"%s",line_ca);
+    encoded_bitsize = stoi(string(line_ca));
+    cout<<"encoded_bitsize="<<encoded_bitsize<<endl;
+
+    while(fscanf(mapfile,"%s",line_ca)!=EOF){
+        string line = string(line_ca);
+        int find_pos = line.find(':', 0);
+        string id = line.substr(0, find_pos);
+        string freq = line.substr(find_pos + 1);
+        hnode_array[stoi(id)]->freq = stoi(freq);
+        all_freq[stoi(id)] = stoi(freq);
+    }
+}
+
+void HuffmanCompressor::read_encoded_file(){
+    cout<<"read_encoded_file "<<input_filepath<<endl;
+    encoded_data_buffer = new unsigned char[encoded_bytesize];
+    memset(encoded_data_buffer,0,encoded_bytesize);
+    FILE* fp = fopen(input_filepath,"rb");
+    if(fp== nullptr){
+        cout<<"Error in open file "<<input_filepath<<endl;
+    }
+    fread(encoded_data_buffer,sizeof(unsigned char), encoded_bytesize,fp);
+    fclose(fp);
+}
+/**
  * @brief read the input file, count frequency of each character
  * @return
  */
-
-int charToInt(char c){
-    return c-'a';
-}
 void HuffmanCompressor::read_raw_file(char* filepath){
     cout<<"read_raw_file "<<filepath<<endl;
     FILE* fp = fopen(filepath,"rb");
@@ -102,11 +157,13 @@ void HuffmanCompressor::read_raw_file(char* filepath){
     }
     fseek(fp,0L,SEEK_END);
     rawdata_size = ftell(fp);
+    cout<<"file size "<<rawdata_size<<endl;
     fseek(fp,0L,SEEK_SET);
     rawdata_buffer = new unsigned char[rawdata_size];
     fread(rawdata_buffer,sizeof(unsigned char), rawdata_size,fp);
     fclose(fp);
 
+//    cout<<"f"<<endl;
     #pragma omp parallel num_threads(threads_num)
     {
         int tid = omp_get_thread_num();
@@ -114,30 +171,38 @@ void HuffmanCompressor::read_raw_file(char* filepath){
         uint32_t start_off = tid * partition_size;
         uint32_t end_off = (tid==omp_get_num_threads()-1)?rawdata_size:start_off+partition_size;
         uint32_t local_freq[CHAR_NUM] = {0};
+        cout<<"start_off="<<start_off<<" end_off="<<end_off<<endl;
         for(uint32_t idx = start_off;idx<end_off;idx++){
             unsigned char c = rawdata_buffer[idx];
-            local_freq[charToInt(c)]++;
+            local_freq[static_cast<int>(c)]++;
         }
+        cout<<"2"<<endl;
         int e;
         for(e=0;e<CHAR_NUM;e++){
             #pragma omp atomic
             all_freq[e] += local_freq[e];
+//            cout<<"local freq[e]="<<local_freq[e]<<endl;
+//            hnode_array[e]->freq += local_freq[e];
         }
     }
-
-    for(int i=0;i<CHAR_NUM;i++){
-        hnode_array[i]->freq = all_freq[i];
+    cout<<"finish"<<endl;
+    int m = 0;
+    for(m=0;m<CHAR_NUM;m++){
+        if(all_freq[m]!=0){
+            hnode_array[m]->freq = all_freq[m];
+//            cout<<m<<" "<<all_freq[m]<<endl;
+        }
     }
 //    compute_time += duration_cast<dsec>(Clock::now() - init_start).count();
 //    cout<<"read_raw_data time= "<<compute_time<<endl;
-
 }
 
 void HuffmanCompressor::init_hnode_array(){
 //    cout<<"init_hnode_array"<<endl;
     for(int i=0;i<CHAR_NUM;i++){
         hnode_array[i]=new hnode;
-        hnode_array[i]->character = 'a'+i;// TODO
+        hnode_array[i]->id = i;
+//        cout<<i<<" "<<hnode_array[i]->character<<endl;
         hnode_array[i]->freq = 0;
     }
 }
@@ -145,9 +210,10 @@ void HuffmanCompressor::init_hnode_array(){
 int HuffmanCompressor::get_output_bitsize(){
     int sum = 0;
     for(int i=0;i<CHAR_NUM;i++){
-        char c = hnode_array[i]->character;
-        int tmp = hnode_array[i]->freq * (char_strcode_map[c].size());
-        sum += tmp;
+        if(all_freq[i]!=0){
+            int tmp = all_freq[i] * (char_strcode_map[i].size());
+            sum += tmp;
+        }
     }
     return sum;
 }
@@ -164,95 +230,70 @@ int HuffmanCompressor::get_local_output_bitsize(uint32_t start_off, uint32_t end
 void HuffmanCompressor::output_encoded_file(){
 //    cout<<"output begin"<<endl;
     uint32_t output_bitsize = get_output_bitsize();
+    int output_bytesize = output_bitsize/8+1;
     cout<<"Target output bitsize = "<<output_bitsize<<endl;
-    unsigned char* output_buffer = new unsigned char[output_bitsize/8+1];// TODO
-    memset(output_buffer,0,output_bitsize/8+1);
+    unsigned char* output_buffer = new unsigned char[output_bytesize];
+    memset(output_buffer,0,output_bytesize);
     uint32_t output_bit_offset = 0;
-
-//    #pragma omp parallel num_threads(threads_num)
-//    {
-//        int tid = omp_get_thread_num();
-//        uint32_t partition_size = rawdata_size/omp_get_num_threads();
-//        uint32_t start_off = tid * partition_size;
-//        uint32_t end_off = (tid==omp_get_num_threads()-1)?rawdata_size:start_off+partition_size;
-//        uint32_t local_output_len = get_local_output_bitsize(start_off,end_off);
-//
-//        uint32_t local_output_buffer[local_output_len] = {0};
-//        uint32_t local_output_bit_offset= 0;
-//        uint32_t byte_offset=0, bit_offset_in_byte=0;
-//
-//        for(uint32_t idx = start_off;idx<end_off;idx++){
-//            huffmanBitSet cur_bitSet = char_code_map[c];
-//            uint32_t bitset_len = cur_bitSet.length();
-//            for (uint32_t i = 0; i < bitset_len; i++) {
-//                // write to the output_buffer one bit by one bit
-//                byte_offset = (i+local_output_bit_offset)/8; // In which Byte of the output
-//                bit_offset_in_byte = (i+local_output_bit_offset)%8; // the bit offset in that byte
-//                local_output_buffer[byte_offset] |= (cur_bitSet[i]<<bit_offset_in_byte);
-//            }
-//            local_output_bit_offset += bitset_len;
-//        }
-//        #pragma omp atomic
-//        memcpy(output_buffer,local_output_buffer,local_output_bit_offset)
-//    }
-
 
     // sequential version that works
     uint32_t byte_offset=0, bit_offset_in_byte=0;
-    for(uint32_t k = 0; k<rawdata_size;k++) {
-        char c = rawdata_buffer[k];
-        huffmanBitSet cur_bitSet = char_code_map[c];
+    for(uint32_t k = 0; k < rawdata_size;  k++) {
+        int char_id = static_cast<int>(rawdata_buffer[k]);
+        huffmanBitSet cur_bitSet = char_code_map[char_id];
         uint32_t bitset_len = cur_bitSet.length();
+//        cout<<rawdata_buffer[k]<<" "<<char_strcode_map[char_id]<<" "<<bitset_len<<endl;
         for (uint32_t i = 0; i < bitset_len; i++) {
             // write to the output_buffer one bit by one bit
             byte_offset = (i+output_bit_offset)/8; // In which Byte of the output
             bit_offset_in_byte = (i+output_bit_offset)%8; // the bit offset in that byte
-            output_buffer[byte_offset] |= (cur_bitSet[i]<<bit_offset_in_byte);
+            output_buffer[byte_offset] |= (static_cast<int>(cur_bitSet[i]) << bit_offset_in_byte);
+//            cout<<cur_bitSet[i]<<" "<<bit_offset_in_byte<<" "<<cur_bitSet[i] << bit_offset_in_byte<<endl;
         }
         output_bit_offset += bitset_len;
     }
-
-//    for(int t=0;t<threads_num;t++){
-//        uint32_t start_off = t * partition_size;
-//        uint32_t end_off = min(start_off + partition_size, rawdata_size);
-//        local_output_size =
-//        auto local_output_buffer = new uint32_t[local_output_size];
-//        for(uint32_t i = start_off; i<end_off;i++) {
-//            char c = rawdata_buffer[i];
-//            huffmanBitSet cur_bitSet = char_code_map[c];
-//            uint32_t bitset_len = cur_bitSet.length();
-//            for (uint32_t i = 0; i < bitset_len; i++) {
-//                // write to the output_buffer one bit by one bit
-//                byte_offset = (i+output_bit_offset)/8; // In which Byte of the output
-//                bit_offset_in_byte = (i+output_bit_offset)%8; // the bit offset in that byte
-//                output_buffer[byte_offset] |= (cur_bitSet[i]<<bit_offset_in_byte);
-//            }
-//            output_bit_offset += bitset_len;
-//        }
-//    }
 
     FILE* fp = fopen(output_filepath,"wb");
     if(fp== nullptr) {
         cout << "Error in open file " << output_filepath << endl;
     }
 
-    fwrite(output_buffer,sizeof(unsigned char),output_bit_offset/8+1,fp);
-    // TODO free pointer;
+    fwrite(output_buffer,sizeof(char),output_bytesize,fp);
     fclose(fp);
+    encoded_bytesize = output_bytesize;
+    encoded_bitsize = output_bitsize;
+
+    delete[] output_buffer;
 }
 
+void HuffmanCompressor::output_encode_map(){
+    // store the frequency_map as {char:freq} in a .txt
+    FILE* fp = fopen(map_filepath,"wb");
+    fprintf(fp,"%d\n",rawdata_size);
+    fprintf(fp,"%d\n",encoded_bytesize);
+    fprintf(fp,"%d\n",encoded_bitsize);
+    for(int i=0;i<CHAR_NUM;i++){
+        if(all_freq[i]!=0){
+            fprintf(fp,"%d:%d\n",i,all_freq[i]);
+        }
+    }
+}
 void HuffmanCompressor::traverse_huffman_tree(hnode* node, huffmanBitSet path, string curstr){
     if(node->left== nullptr && node->right== nullptr){
-        char_code_map[node->character] = path;
-        char_strcode_map[node->character] = curstr;
+        char_code_map[node->id] = path;
+        char_strcode_map[node->id] = curstr;
+        cout<<static_cast<char>(node->id)<<" ";
+        for(uint32_t idx=0;idx<path.length();idx++){
+            cout<<path[idx];
+        }
         return;
     }
-    path.append('0');
+    path.append(0);
     curstr+='0';
     traverse_huffman_tree(node->left,path,curstr);
     path.remove_last();
     curstr = curstr.substr(0,curstr.size()-1);
-    path.append('1');
+    path.append(1);
     curstr+='1';
     traverse_huffman_tree(node->right,path,curstr);
     curstr = curstr.substr(0,curstr.size()-1);
@@ -272,18 +313,61 @@ void HuffmanCompressor::encode() {
     huffmanBitSet path;
     string s;
     traverse_huffman_tree(root, path, s);
+    for (auto &t: char_strcode_map) {
+        cout << static_cast<char>(t.first) << " " << t.second << endl;
+    }
+}
 
-//    auto iter = char_strcode_map.begin();
-//    for (auto &t: char_strcode_map) {
-//        cout << t.first << " " << t.second << endl;
-//    }
+void HuffmanCompressor::decode(){
+    rawdata_buffer = new unsigned char[rawdata_size+1];
+    memset(rawdata_buffer,0,rawdata_size+1);
+    hnode* root = pq.top();
+    hnode* cur_node = root;
+
+    uint32_t rawdata_off = 0;
+    uint32_t byte_off = 0;
+    uint32_t bit_off = 0;
+
+    for(uint32_t encoded_bit_off = 0; encoded_bit_off<encoded_bitsize;encoded_bit_off++){
+        if(cur_node->left== nullptr && cur_node->right==nullptr){
+            cout<<rawdata_off<<" "<<static_cast<char>(cur_node->id)<<endl;
+            rawdata_buffer[rawdata_off++]=static_cast<char>(cur_node->id);
+            cur_node = root;
+        }
+        byte_off = encoded_bit_off/8;
+        bit_off = encoded_bit_off%8;
+        if((encoded_data_buffer[byte_off]>>bit_off) & 1 ){
+            // this bit is 1
+            if(cur_node==nullptr || cur_node->right==nullptr){
+                cout<<"Error that right is null?"<<endl;
+            } else {
+                cur_node = cur_node -> right;
+            }
+        } else {
+            // this bit is 0
+            if(cur_node==nullptr || cur_node->left==nullptr){
+                cout<<"Error that left is null?"<<endl;
+            } else {
+                cur_node = cur_node -> left;
+            }
+        }
+    }
+    if(cur_node->left== nullptr && cur_node->right==nullptr){
+        rawdata_buffer[rawdata_off++]=static_cast<char>(cur_node->id);
+        cur_node = root;
+    }
+    if(rawdata_off!=rawdata_size){
+        cout<<"Error that rawdata overflow: rawdata_off="<<rawdata_off<<" rawdata_size="<<rawdata_size<<endl;
+    }
 }
 
 void HuffmanCompressor::build_huffman_tree(){
-//    cout<<"build_huffman_tree"<<endl;
+    cout<<"build_huffman_tree"<<endl;
     // add to priority queue
     for(int i=0;i<CHAR_NUM;i++){
-        pq.push(hnode_array[i]);
+        if(all_freq[i]!=0){
+            pq.push(hnode_array[i]);
+        }
     }
 //    cout<<"build 1"<<endl;
     // get every top two hnode, merge them until only one node
@@ -299,6 +383,17 @@ void HuffmanCompressor::build_huffman_tree(){
         new_hnode->right = top2;
         pq.push(new_hnode);
     }
+    cout<<"pq freq= "<<pq.top()->freq<<endl;
+}
+
+void HuffmanCompressor::output_decoded_file(){
+    cout<<"output decoded file to "<<output_filepath<<endl;
+    FILE* fp = fopen(output_filepath, "wb");
+    if(fp== nullptr) {
+        cout << "Error in open file " << output_filepath << endl;
+    }
+    fwrite(rawdata_buffer,sizeof(char),rawdata_size,fp);
+    fclose(fp);
 }
 
 void HuffmanCompressor::get_encoded_file(){
@@ -325,6 +420,34 @@ void HuffmanCompressor::get_encoded_file(){
     output_encoded_file();
     compute_time = duration_cast<dsec>(Clock::now() - init_start).count();
     cout<<"*** output time= "<<compute_time<<endl;
+
+    output_encode_map();
+
+    // free the memory
+    delete[] rawdata_buffer;
+    while(!pq.empty()){
+        hnode* cur = pq.top();
+        pq.pop();
+        delete cur;
+    }
+}
+
+void HuffmanCompressor::get_decoded_file(){
+    init_hnode_array();
+    read_encode_map();// fill all_freq[], hnode_array[i]
+    read_encoded_file();// put encoded data into encoded_data_buffer
+    build_huffman_tree();// use pq build the tree
+    decode();// decode according hfmtree
+    output_decoded_file();
+
+    // free the memory
+    delete[] rawdata_buffer;
+    delete[] encoded_data_buffer;
+    while(!pq.empty()){
+        hnode* cur = pq.top();
+        pq.pop();
+        delete cur;
+    }
 }
 
 

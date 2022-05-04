@@ -3,7 +3,7 @@ using namespace std;
 #include <stdio.h>
 #include <string.h>
 
-const uint32_t block_len = 32;
+const uint32_t block_len = 8;
 
 class huffmanBitSet{
 private:
@@ -17,7 +17,7 @@ public:
         memset(data,0,block_len);
     }
 
-    uint32_t length(){
+    uint32_t length() const{
         return len;
     }
 
@@ -27,7 +27,8 @@ public:
         }
         uint32_t idxByte = len/8;
         uint32_t idxBit = len%8;
-        if(c=='1'){
+//        cout<<"append "<<c<<endl;
+        if(c&1){
             data[idxByte] |= (1<<idxBit);
         } else {
             data[idxByte] &= (~(1<<idxBit));
@@ -47,4 +48,15 @@ public:
         bool res = static_cast<bool>((data[byte_offset]>>bit_offset) & 1);
         return res;
     }
+
+    unsigned char* getData() const{
+        return data;
+    }
+
+    huffmanBitSet& operator=(const huffmanBitSet &h){
+        len = h.length();
+        memcpy(data,h.getData(),block_len);
+        return *this;
+    }
+
 };

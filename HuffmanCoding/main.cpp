@@ -11,22 +11,29 @@ int main(int argc, char *argv[])
     typedef std::chrono::duration<double> dsec;
 
     HuffmanCompressor hc;
-    char* input = argv[1];
-    char* output = argv[2];
-    int thread_num = atoi(argv[3]);
+    char* operation = argv[1];
+    char* input = argv[2];
+    char* output = argv[3];
+    char* mapfilepath = argv[4];
+    int thread_num = atoi(argv[5]);
 
-    hc.set_filepath(input,output);
+
+    hc.set_filepath(input,output,mapfilepath);
     hc.set_thread_num(thread_num);// or set to 1 to execute sequentially
 
     auto init_start = Clock::now();
     double compute_time = 0;
 
-    hc.get_encoded_file();
+    if(*operation=='e'){
+        // encode file:  ./main d test.txt out.bin map.txt 4
+        hc.get_encoded_file();
+    } else {
+        // decode file:  ./main d out.bin map.txt 4
+        hc.get_decoded_file();
+    }
+
+//    cout<<"hi"<<endl;
     compute_time += duration_cast<dsec>(Clock::now() - init_start).count();
-//    hc.get_encoded_map();
-//    char* decoded_file = argv[3];
-//    hc.set_decode_filepath(decoded_file);
-//    hc.get_decoded_file();
     cout<<"***** compute time= "<<compute_time<<endl;
     cout<<"OK"<<endl;
     return 0;
