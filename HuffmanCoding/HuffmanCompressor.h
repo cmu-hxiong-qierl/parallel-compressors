@@ -11,17 +11,18 @@
 #include <vector>
 #include <omp.h>
 #include <chrono>
-
 #include "huffmanBitSet.h"
+
+#define CHAR_NUM 128
 using namespace std;
 using namespace std::chrono;
 typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::duration<double> dsec;
 
+
 struct hnode
 {
     char character;
-    string code;
     int freq;
     hnode *left;
     hnode *right;
@@ -37,9 +38,9 @@ private:
     char* output_filepath;
     uint32_t rawdata_size;
     unsigned char* rawdata_buffer;
-    map<char,int> char_freq_map;
-    hnode* hnode_array[26];
+    hnode* hnode_array[CHAR_NUM];
     int threads_num = 0;
+
     struct compare{
         bool operator()(hnode* a, hnode* b){
             return a->freq >= b->freq;
@@ -48,6 +49,8 @@ private:
     priority_queue<hnode*,vector<hnode*>,compare> pq;
     unordered_map<unsigned char, huffmanBitSet> char_code_map;
     map<char, string> char_strcode_map;
+//    map<char, int> char_freq_map;
+    uint32_t all_freq[CHAR_NUM] = {0};
 
 
 
@@ -72,6 +75,8 @@ public:
     int get_output_bitsize();
 
     void get_encoded_file();
+
+    int get_local_output_bitsize(uint32_t start_off, uint32_t end_off);
 
 };
 
@@ -102,49 +107,35 @@ void HuffmanCompressor::read_raw_file(char* filepath){
     fread(rawdata_buffer,sizeof(unsigned char), rawdata_size,fp);
     fclose(fp);
 
-    uint32_t all_freq[26] = {0};
     #pragma omp parallel num_threads(threads_num)
     {
         int tid = omp_get_thread_num();
         uint32_t partition_size = rawdata_size/omp_get_num_threads();
         uint32_t start_off = tid * partition_size;
         uint32_t end_off = (tid==omp_get_num_threads()-1)?rawdata_size:start_off+partition_size;
-        uint32_t local_freq[26] = {0};
+        uint32_t local_freq[CHAR_NUM] = {0};
         for(uint32_t idx = start_off;idx<end_off;idx++){
             unsigned char c = rawdata_buffer[idx];
             local_freq[charToInt(c)]++;
         }
-        for(int i=0;i<26;i++){
+        int e;
+        for(e=0;e<CHAR_NUM;e++){
             #pragma omp atomic
-            all_freq[i] += local_freq[i];
+            all_freq[e] += local_freq[e];
         }
     }
 
-    for(int i=0;i<26;i++){
-        hnode_array[i]->freq += all_freq[i];
+    for(int i=0;i<CHAR_NUM;i++){
+        hnode_array[i]->freq = all_freq[i];
     }
-
-//    for(int t = 0;t<threads_num;t++){
-//        uint32_t start_off = t * partition_size;
-//        uint32_t end_off = min(rawdata_size,start_off+partition_size);
-//        memset(freq_array,0,sizeof(uint32_t)*26);
-//
-//        for(uint32_t i=start_off;i<end_off;i++){
-//            char x = rawdata_buffer[i];
-//            freq_array[charToInt(x)]++;
-//        }
-//
-//        for(int j=0;j<26;j++){
-//            hnode_array[j]->freq += freq_array[j];
-//        }
-//    }
 //    compute_time += duration_cast<dsec>(Clock::now() - init_start).count();
 //    cout<<"read_raw_data time= "<<compute_time<<endl;
+
 }
 
 void HuffmanCompressor::init_hnode_array(){
-    cout<<"init_hnode_array"<<endl;
-    for(int i=0;i<26;i++){
+//    cout<<"init_hnode_array"<<endl;
+    for(int i=0;i<CHAR_NUM;i++){
         hnode_array[i]=new hnode;
         hnode_array[i]->character = 'a'+i;// TODO
         hnode_array[i]->freq = 0;
@@ -153,7 +144,7 @@ void HuffmanCompressor::init_hnode_array(){
 
 int HuffmanCompressor::get_output_bitsize(){
     int sum = 0;
-    for(int i=0;i<26;i++){
+    for(int i=0;i<CHAR_NUM;i++){
         char c = hnode_array[i]->character;
         int tmp = hnode_array[i]->freq * (char_strcode_map[c].size());
         sum += tmp;
@@ -161,27 +152,57 @@ int HuffmanCompressor::get_output_bitsize(){
     return sum;
 }
 
+int HuffmanCompressor::get_local_output_bitsize(uint32_t start_off, uint32_t end_off){
+    int sum = 0;
+    for(uint32_t i=start_off;i<end_off;i++){
+        unsigned char c = rawdata_buffer[i];
+        sum += char_strcode_map[c].size();
+    }
+    return sum;
+}
 
 void HuffmanCompressor::output_encoded_file(){
-    // output each character
 //    cout<<"output begin"<<endl;
     uint32_t output_bitsize = get_output_bitsize();
     cout<<"Target output bitsize = "<<output_bitsize<<endl;
     unsigned char* output_buffer = new unsigned char[output_bitsize/8+1];// TODO
     memset(output_buffer,0,output_bitsize/8+1);
     uint32_t output_bit_offset = 0;
+
+//    #pragma omp parallel num_threads(threads_num)
+//    {
+//        int tid = omp_get_thread_num();
+//        uint32_t partition_size = rawdata_size/omp_get_num_threads();
+//        uint32_t start_off = tid * partition_size;
+//        uint32_t end_off = (tid==omp_get_num_threads()-1)?rawdata_size:start_off+partition_size;
+//        uint32_t local_output_len = get_local_output_bitsize(start_off,end_off);
+//
+//        uint32_t local_output_buffer[local_output_len] = {0};
+//        uint32_t local_output_bit_offset= 0;
+//        uint32_t byte_offset=0, bit_offset_in_byte=0;
+//
+//        for(uint32_t idx = start_off;idx<end_off;idx++){
+//            huffmanBitSet cur_bitSet = char_code_map[c];
+//            uint32_t bitset_len = cur_bitSet.length();
+//            for (uint32_t i = 0; i < bitset_len; i++) {
+//                // write to the output_buffer one bit by one bit
+//                byte_offset = (i+local_output_bit_offset)/8; // In which Byte of the output
+//                bit_offset_in_byte = (i+local_output_bit_offset)%8; // the bit offset in that byte
+//                local_output_buffer[byte_offset] |= (cur_bitSet[i]<<bit_offset_in_byte);
+//            }
+//            local_output_bit_offset += bitset_len;
+//        }
+//        #pragma omp atomic
+//        memcpy(output_buffer,local_output_buffer,local_output_bit_offset)
+//    }
+
+
+    // sequential version that works
     uint32_t byte_offset=0, bit_offset_in_byte=0;
-
-    omp_set_num_threads(threads_num);
-//    uint32_t partition_size = (rawdata_size+threads_num-1)/threads_num;
-//    auto init_start = Clock::now();
-//    double compute_time = 0;
-
     for(uint32_t k = 0; k<rawdata_size;k++) {
         char c = rawdata_buffer[k];
         huffmanBitSet cur_bitSet = char_code_map[c];
         uint32_t bitset_len = cur_bitSet.length();
-//        #pragma omp parallel for
         for (uint32_t i = 0; i < bitset_len; i++) {
             // write to the output_buffer one bit by one bit
             byte_offset = (i+output_bit_offset)/8; // In which Byte of the output
@@ -261,7 +282,7 @@ void HuffmanCompressor::encode() {
 void HuffmanCompressor::build_huffman_tree(){
 //    cout<<"build_huffman_tree"<<endl;
     // add to priority queue
-    for(int i=0;i<26;i++){
+    for(int i=0;i<CHAR_NUM;i++){
         pq.push(hnode_array[i]);
     }
 //    cout<<"build 1"<<endl;
