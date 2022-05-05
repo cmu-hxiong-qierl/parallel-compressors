@@ -38,6 +38,36 @@ The tests is run on PSC machines sequentially and parallelly from num_threads 1 
 
 
 
+
+
+| 10wap(32M) |                          |                                 |                       |                 |               |
+| ---------- | ------------------------ | ------------------------------- | --------------------- | --------------- | ------------- |
+| Algorithm  | Thread Num               | Input Time (ms)                 | Compression Time (ms) | Total Time (ms) | Total Speedup |
+| Huffman    | 1                        | 28.332                          | 1658.56               | 1702.26         | 1.000         |
+|            | 4                        | 13.6374                         | 667.689               | 696.701         | 2.443         |
+|            | 8                        | 11.8753                         | 209.68                | 236.976         | 7.183         |
+|            | 16                       | 11.407                          | 107.579               | 153.547         | 11.086        |
+|            | 32                       | 11.8537                         | 57.2743               | 84.5705         | 20.128        |
+|            | 64                       | 23.626                          | 46.0987               | 85.2528         | 19.967        |
+|            | Raw File Bytes: 32022870 | Compressed File Bytes: 17987649 |                       |                 |               |
+|            | Compression Ratio        | 0.562 (其实应该取倒数，1.779)   |                       |                 |               |
+|            | Decode Time              | 616.528ms                       |                       |                 |               |
+
+| angular.js (21M) |                         |                                |                       |                 |               |
+| ---------------- | ----------------------- | ------------------------------ | --------------------- | --------------- | ------------- |
+| Algorithm        | Thread Num              | Input Time (ms)                | Compression Time (ms) | Total Time (ms) | Total Speedup |
+| Huffman          | 1                       | 20.782                         | 1037.930              | 1087.510        | 1.000         |
+|                  | 4                       | 11.148                         | 271.698               | 294.180         | 3.697         |
+|                  | 8                       | 8.660                          | 132.590               | 152.936         | 7.111         |
+|                  | 16                      | 8.530                          | 68.518                | 88.530          | 12.284        |
+|                  | 32                      | 18.716                         | 37.405                | 67.559          | 16.097        |
+|                  | 64                      | 14.617                         | 23.218                | 49.677          | 21.892        |
+|                  | Raw File Bytes 22046527 | Compressed File Bytes:13294321 |                       |                 |               |
+|                  | Compression Ratio       | 0.603(1.658)                   |                       |                 |               |
+|                  | Decode Time             | 381.781 ms                     |                       |                 |               |
+
+
+
 ### LZ77
 
 #### Intro
@@ -106,6 +136,8 @@ As the window size and buffer size increases, the length of the matched sequence
 
 The records of benchmarking is shown below:
 
+Correctness is checked by md5sum and diff command.
+
 Compression ratio negligible for sequential and parallel results.
 
 When the number of threads is below 16, the speedup is nearly linear to num_threads.
@@ -146,15 +178,17 @@ For files that has more duplicated content (angular.js), the compression ratio i
 
 One of the reason that speedup can't increase linearly when number of threads increase is **uneven distribution**. Although we partitions the file into parts of same size, the **matching process** might requires different amount of scans for different positions. When the current sequence unmatches, the scan stops and continute to the next section. And it's nature for files having different amount of duplicated sequence at different positions.
 
-By recording each time of OpenMP thread, we proves that uneven distribution is one of the reason that it fails to achieve linear speedup.
+By recording each time of OpenMP thread, we proves that uneven workload distribution is one of the reason that it fails to achieve linear speedup.
 
 <img src="uneven.png" alt="uneven" style="zoom:50%;" />
 
 The reason that more duplicated content has better the compression ratio is the nature of LZ77 algorithms. With more duplicated content, tuples could reprsents longer sequence in the original files.
 
-### Comparison for Huffman vs. LZ77
+### Comparison for Huffman vs. LZ77 and among different traces
 
 #### Speedup
+
+The speedups for each algorithm on 3 main test traces are shown below:
 
 <img src="text_small.jpg" alt="text_small" style="zoom:50%;" />
 
@@ -164,9 +198,17 @@ The reason that more duplicated content has better the compression ratio is the 
 
 <img src="source_code.jpg" alt="text_small" style="zoom:50%;" />
 
+It could be concluded:
+
+1. LZ77 is genearally more parallelizable than Huffman, probably for its higher ratio of parallelizable part and huffman's overhead of synchronization.
+2. Larger files has better speedups than smaller files when number of threads is big, probably for its greater ratio of parallelizable part comparing to the overhead.
+3. The performance of parallism is highly trace-dependent. Literature files shows better speedups for LZ77 than source codes, probably for its more even workload distributions. On the other hand, Huffman doesn't suffer from uneven workload distribution.
+
 #### Compression ratio
 
+LZ77 shows a much better compression ratio (2.29) than Huffman Coding (1.66) on angular.js, while similar ratio (1.59) with Huffman Coding (1.78) on *war and peace*.
 
+It's because the nature of the different algorithms: LZ77 performs better when content is more duplicated, while Huffman Coding performs better when the byte patterns show greatly different frequencies.
 
 ### Why not GPU/CUDA?
 
@@ -209,7 +251,7 @@ In the tests we conducted, for general file (size 3MB ~ 30MB), the speedup stops
 
 ### Conclusion
 
-
+xxx
 
 
 
