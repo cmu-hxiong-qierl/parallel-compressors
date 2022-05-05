@@ -48,7 +48,7 @@ LZ77, short for Lempel-Ziv algorithm, is a lossless data-compression algorithm c
 
 
 
-![lz77_intro](lz77_intro.png)
+<img src="lz77_intro.png" alt="lz77_intro" style="zoom: 50%;" />
 
 ​				the slide refered from 15-853 lesson
 
@@ -104,7 +104,15 @@ As the window size and buffer size increases, the length of the matched sequence
 
 #### Result
 
-We recorded
+The records of benchmarking is shown below:
+
+Compression ratio negligible for sequential and parallel results.
+
+When the number of threads is below 16, the speedup is nearly linear to num_threads.
+
+When the number of threads reach 128, the speedup stops increasing.
+
+For files that has more duplicated content (angular.js), the compression ratio is much better.
 
 | war&peace(32M) |                         |                                |                 |               |
 | -------------- | ----------------------- | ------------------------------ | --------------- | ------------- |
@@ -116,7 +124,6 @@ We recorded
 |                | 32                      | 962.479                        | 1001.362        | 21.815        |
 |                | 64                      | 422.977                        | 453.289         | 48.192        |
 |                | 128                     | 325.274                        | 357.07          | 61.178        |
-|                |                         |                                |                 |               |
 |                | Raw File Bytes 32022870 | Compressed File Bytes:20156523 |                 |               |
 |                | Compression Ratio       | 1.59                           |                 |               |
 |                | Decode Time             | 851.717ms                      |                 |               |
@@ -137,19 +144,27 @@ We recorded
 
 ##### Analysis
 
+One of the reason that speedup can't increase linearly when number of threads increase is **uneven distribution**. Although we partitions the file into parts of same size, the **matching process** might requires different amount of scans for different positions. When the current sequence unmatches, the scan stops and continute to the next section. And it's nature for files having different amount of duplicated sequence at different positions.
 
+By recording each time of OpenMP thread, we proves that uneven distribution is one of the reason that it fails to achieve linear speedup.
 
+<img src="uneven.png" alt="uneven" style="zoom:50%;" />
 
+The reason that more duplicated content has better the compression ratio is the nature of LZ77 algorithms. With more duplicated content, tuples could reprsents longer sequence in the original files.
 
 ### Comparison for Huffman vs. LZ77
 
-![text_small](text_small.jpg)
+#### Speedup
 
-![text_big](text_big.jpg)
+<img src="text_small.jpg" alt="text_small" style="zoom:50%;" />
+
+<img src="text_big.jpg" alt="text_big" style="zoom:50%;" />
 
 
 
-![text_small](source_code.jpg)
+<img src="source_code.jpg" alt="text_small" style="zoom:50%;" />
+
+#### Compression ratio
 
 
 
@@ -192,6 +207,7 @@ In the tests we conducted, for general file (size 3MB ~ 30MB), the speedup stops
 
 
 
+### Conclusion
 
 
 
@@ -199,6 +215,7 @@ In the tests we conducted, for general file (size 3MB ~ 30MB), the speedup stops
 
 
 
+---------------------------------------
 
 
 
