@@ -307,7 +307,6 @@ The speedups for each algorithm on 3 main test traces are shown below:
 <img src="text_small.jpg" alt="text_small" style="zoom:50%;" />
 
 <img src="text_big.png" alt="截屏2022-05-05 下午7.42.15" style="zoom:50%;" />
-
 <img src="source_code.jpg" alt="source_code" style="zoom:50%;" />
 
 It could be concluded:
@@ -338,7 +337,7 @@ Let's check the throughput of industrial implementations:
 
 ![industry_performance](industry_performance.png)
 
-Considering the bandwith of bus (which is probably what limits the communication between CPU and GPU:
+Considering the bandwith of bus, which is probably what limits the communication between CPU and GPU:
 
 PCI-E Version 3.x:
 
@@ -365,13 +364,43 @@ In the tests we conducted, for general file (size 3MB ~ 30MB), the speedup stops
 
 ### Conclusion
 
-xxx
+For a compression algorithm combine t1 time of Lempel-Ziv family encoding and t2 time of Entropy encoding of size m MB, the potential quickest duration is approximately:
+
+t1/28 + t2/14, when m ~= 3
+
+t1/44 + t2/22, when m ～= 20
+
+T1/61 + t2/22, when m ~= 32
 
 
 
 
 
 ---------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
