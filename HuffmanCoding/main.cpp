@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
 
 //    cout<<"hi"<<endl;
     compute_time += duration_cast<dsec>(Clock::now() - init_start).count();
-    cout<<"***** compute time= "<<compute_time<<endl;
+    cout<<"***** Total Time= "<<compute_time<<endl;
     cout<<"OK"<<endl;
     return 0;
 }

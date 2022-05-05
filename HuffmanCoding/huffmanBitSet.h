@@ -8,6 +8,7 @@ const uint32_t block_len = 8;
 class huffmanBitSet{
 private:
     uint32_t len;
+//    unsigned char data[block_len];
     unsigned char *data;
 
 public:
@@ -15,6 +16,16 @@ public:
         len = 0;
         data = new unsigned char[block_len];
         memset(data,0,block_len);
+    }
+
+    huffmanBitSet(const huffmanBitSet &h){
+        len = h.length();
+        data = new unsigned char[block_len];
+        memcpy(data,h.getData(),block_len);
+    }
+
+    ~huffmanBitSet(){
+        delete data;
     }
 
     uint32_t length() const{
@@ -55,6 +66,7 @@ public:
 
     huffmanBitSet& operator=(const huffmanBitSet &h){
         len = h.length();
+        data = new unsigned char[block_len];
         memcpy(data,h.getData(),block_len);
         return *this;
     }
