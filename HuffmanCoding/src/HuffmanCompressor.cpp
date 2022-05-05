@@ -217,9 +217,6 @@ void HuffmanCompressor::generate_encoded_file_parallel(){
         thread_output_bit_bound[2*t+1] = thread_output_bit_bound[2*t] + local_bitsize;
         all_byteoff += local_bytesize;
     }
-    if(encoded_bytesize != all_byteoff){
-        cout<<"encoded_bytesize!=all_byteoff?"<<endl;
-    }
     encoded_bitsize = encoded_bytesize*8;
 }
 
