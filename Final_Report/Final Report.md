@@ -306,7 +306,11 @@ The speedups for each algorithm on 3 main test traces are shown below:
 
 <img src="text_small.jpg" alt="text_small" style="zoom:50%;" />
 
+<<<<<<< HEAD
 <img src="text_big.png" alt="截屏2022-05-05 下午7.42.15" style="zoom:50%;" />
+=======
+<img src="text_big.png" alt="text_big" style="zoom:50%;">
+>>>>>>> a04e552 (Merge)
 <img src="source_code.jpg" alt="source_code" style="zoom:50%;" />
 
 It could be concluded:
