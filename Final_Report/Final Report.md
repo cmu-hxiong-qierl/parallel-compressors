@@ -1,3 +1,7 @@
+
+
+
+
 # Parallel Lossless Compressors
 
 Huilin Xiong (hxiong)
@@ -36,11 +40,11 @@ The tests is run on PSC machines sequentially and parallelly from num_threads 1 
 
 ### LZ77
 
-##### Intro
+#### Intro
 
 LZ77, short for Lempel-Ziv algorithm, is a lossless data-compression algorithm created by Lempel and Ziv in 1977. LZ77 has been adopted for many modern complicated algorithms such as Facebook's zstd.
 
-##### Breakdown
+#### Breakdown
 
 
 
@@ -60,7 +64,7 @@ For most storage (disk, SSD...), reading/writing will not benefit from parallism
 
 Generally the parallelizable of the process is the step 2. And as the file size grows, the ratio of time of step 2 increases. It could be concluded that large file is more parallelizable. And a linear-speedup of compression (throughput) is expected for large files.
 
-The strategy of parallism is to **partition consecutive parts** of original files and indicates the parallism in the headers. The pitfall for ratio/speedup is the following:
+The strategy of parallism is to **partition consecutive parts of original files, and then encode the partitions each as sequentially** and indicates the parallism in the headers. The pitfall for ratio/speedup is the following:
 
 1. Partition might break a potential matched sequence and require more encoding tuples.
 2. Extra padding is needed, as encoding is bit-level and partition and headers are byte-level.
@@ -68,7 +72,7 @@ The strategy of parallism is to **partition consecutive parts** of original file
 
 Above 2 pitfalls just requires a few bytes to encode, which is negligible and the following tests prove it.
 
-##### Deliverables
+#### Deliverables
 
 A executable program is developed and configurable based on the following strategy. The decoding process is not parallelized because it is comparably fast.
 
@@ -98,23 +102,91 @@ The tuple is configurable in the source file compress.h as following:
 
 As the window size and buffer size increases, the length of the matched sequence is likely to be longer, but it requires more bits to represent each tuple and also more time to compress. And it's highly trace-dependent. Based on the test files, the default configuration achieves a reasonable throughput and compression ratio.
 
-##### Result
+#### Result
 
+We recorded
 
+| war&peace(32M) |                         |                                |                 |               |
+| -------------- | ----------------------- | ------------------------------ | --------------- | ------------- |
+| Algorithm      | Thread Num              | Compress Time                  | Total Time (ms) | Total Speedup |
+| lz77           | 1                       | 21807.544                      | 21844.794       | 1.000         |
+|                | 4                       | 5467.133                       | 5498.592        | 3.973         |
+|                | 8                       | 2753.437                       | 2792.868        | 7.822         |
+|                | 16                      | 1558.221                       | 1595.659        | 13.690        |
+|                | 32                      | 962.479                        | 1001.362        | 21.815        |
+|                | 64                      | 422.977                        | 453.289         | 48.192        |
+|                | 128                     | 325.274                        | 357.07          | 61.178        |
+|                |                         |                                |                 |               |
+|                | Raw File Bytes 32022870 | Compressed File Bytes:20156523 |                 |               |
+|                | Compression Ratio       | 1.59                           |                 |               |
+|                | Decode Time             | 851.717ms                      |                 |               |
+
+| angular.js (21M) |                         |                               |                 |               |
+| ---------------- | ----------------------- | ----------------------------- | --------------- | ------------- |
+| Algorithm        | Thread Num              | Compress Time                 | Total Time (ms) | Total Speedup |
+| lz77             | 1                       | 9298.655                      | 9319.683        | 1.000         |
+|                  | 4                       | 2458.891                      | 2476.388        | 3.763         |
+|                  | 8                       | 1225.719                      | 1252.558        | 7.441         |
+|                  | 16                      | 644.235                       | 665.019         | 14.014        |
+|                  | 32                      | 338.801                       | 361.162         | 25.805        |
+|                  | 64                      | 185.644                       | 211.809         | 44.000        |
+|                  | 128                     | 201.124                       | 220.842         | 42.201        |
+|                  | Raw File Bytes 22046527 | Compressed File Bytes:9631119 |                 |               |
+|                  | Compression Ratio       | 2.29                          |                 |               |
+|                  | Decode Time             | 438.476 ms                    |                 |               |
 
 ##### Analysis
 
 
 
-### Why not GPU?
 
-##### Memory bound
+
+### Comparison for Huffman vs. LZ77
+
+![text_small](text_small.jpg)
+
+![text_big](text_big.jpg)
+
+
+
+![text_small](source_code.jpg)
+
+
+
+### Why not GPU/CUDA?
+
+The reason why we don't implement parallel versions of algorithms on CUDA is clear.
+
+##### Memory bound and communication overhead
+
+Compression algorithms requires a great amount of memory, that it reads the whole original file into memory and writes backs the whole encoded file.
+
+If apply CUDA-version for the algorithms, the communication between CPU and GPU includes the whole original file and the whole encoded file.
+
+Let's check the throughput of industrial implementations:
+
+![industry_performance](industry_performance.png)
+
+Considering the bandwith of bus (which is probably what limits the communication between CPU and GPU:
+
+PCI-E Version 3.x:
+
+8 GT/s
+
+- **×1:** 985 MB/s
+- **×16:** 15.75 GB/s
+
+
+
+It's absolutely not reasonable to develop a GPU version of compression algorithms as the bandwith of communication overhead is nearly the throughput of the sequential compression algorithms. Even though our implementation is slow enough to gain speedup with the communication overhead, it's meaningless to do so.
 
 ##### Algorithms are not highly parallelizable (with great number of threads)
 
+As mentioned above, the 2 algorithms are **not** highly parallelizable, especially the Huffman Coding. For both algorithms the ratio of parallelizable part limits the speedups. 
 
+What's more, the overhead might outweight the benefits of parallism. For Huffman Coding, it requires extra synchronization (althought the atomic operation is not so costly) to record the frequency of characters, so the overhead increases as the number of threads increase. For LZ77, partitioning breaks character sequences which might lead to a worst compression ratio.
 
-### Comparison
+In the tests we conducted, for general file (size 3MB ~ 30MB), the speedup stops increasing or increases very little when the number of threads reach around 32~128 for both algorithms. There is no reason to implement a CUDA-version for compression algorithms as the threads of CUDA are numbers of thousands.
 
 
 
