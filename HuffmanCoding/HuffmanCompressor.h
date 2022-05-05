@@ -13,7 +13,7 @@
 #include <chrono>
 #include "huffmanBitSet.h"
 
-#define CHAR_NUM 128
+#define CHAR_NUM 256
 using namespace std;
 using namespace std::chrono;
 typedef std::chrono::high_resolution_clock Clock;
@@ -87,6 +87,8 @@ public:
 
     void output_encoded_file();
 
+    void generate_encoded_file();
+
     void output_encode_map();
 
     void build_huffman_tree();
@@ -110,6 +112,8 @@ public:
     void output_decoded_file();
 
     int get_local_output_bitsize(uint32_t start_off, uint32_t end_off);
+
+    void generate_encoded_file_parallel();
 };
 
 void HuffmanCompressor::set_filepath(char* input, char* output, char* mapfilepath){
@@ -153,14 +157,22 @@ void HuffmanCompressor::read_encode_map(){
 
 void HuffmanCompressor::read_encoded_file(){
     cout<<"read_encoded_file "<<input_filepath<<endl;
-    encoded_data_buffer = new unsigned char[encoded_bytesize];
-    memset(encoded_data_buffer,0,encoded_bytesize);
     FILE* fp = fopen(input_filepath,"rb");
     if(fp== nullptr){
         cout<<"Error in open file "<<input_filepath<<endl;
     }
-    cout<<"hi"<<endl;
-    fread(encoded_data_buffer,sizeof(unsigned char), encoded_bytesize,fp);
+    fseek(fp,0L,SEEK_END);
+    uint32_t encoded_file_size = ftell(fp);
+//    cout<<"encoded file size "<<encoded_file_size<<endl;
+    fseek(fp,0L,SEEK_SET);
+    if(encoded_file_size!=encoded_bytesize){
+        cout<<encoded_file_size<<" "<<encoded_bytesize<<endl;
+    }
+    encoded_data_buffer = new unsigned char[encoded_file_size];
+    memset(encoded_data_buffer,0,encoded_file_size);
+
+//    cout<<"hi"<<endl;
+    fread(encoded_data_buffer,sizeof(unsigned char), encoded_file_size,fp);
     fclose(fp);
 }
 /**
@@ -233,22 +245,22 @@ int HuffmanCompressor::get_output_bitsize(){
     return sum;
 }
 
-int HuffmanCompressor::get_local_output_bitsize(uint32_t start_off, uint32_t end_off){
-    int sum = 0;
+uint32_t HuffmanCompressor::get_local_output_bitsize(uint32_t start_off, uint32_t end_off){
+    uint32_t sum = 0;
     for(uint32_t i=start_off;i<end_off;i++){
-        unsigned char c = rawdata_buffer[i];
+        int c = static_cast<int>(rawdata_buffer[i]);
         sum += char_strcode_map[c].size();
     }
     return sum;
 }
 
-void HuffmanCompressor::output_encoded_file(){
-//    cout<<"output begin"<<endl;
-    uint32_t output_bitsize = get_output_bitsize();
-    int output_bytesize = output_bitsize/8+1;
-    cout<<"Target output bitsize = "<<output_bitsize<<endl;
-    unsigned char* output_buffer = new unsigned char[output_bytesize];
-    memset(output_buffer,0,output_bytesize);
+void HuffmanCompressor::generate_encoded_file(){
+//    cout<<"generate begin"<<endl;
+    encoded_bitsize = get_output_bitsize();
+    encoded_bytesize = encoded_bitsize/8+1;
+    cout<<"Target output bitsize = "<<encoded_bitsize<<endl;
+    encoded_data_buffer = new unsigned char[encoded_bytesize];
+    memset(encoded_data_buffer,0, encoded_bytesize);
     uint32_t output_bit_offset = 0;
 
     // sequential version that works
@@ -262,27 +274,114 @@ void HuffmanCompressor::output_encoded_file(){
             // write to the output_buffer one bit by one bit
             byte_offset = (i+output_bit_offset)/8; // In which Byte of the output
             bit_offset_in_byte = (i+output_bit_offset)%8; // the bit offset in that byte
-            output_buffer[byte_offset] |= (static_cast<int>(cur_bitSet[i]) << bit_offset_in_byte);
+            encoded_data_buffer[byte_offset] |= (static_cast<int>(cur_bitSet[i]) << bit_offset_in_byte);
 //            cout<<cur_bitSet[i]<<" "<<bit_offset_in_byte<<" "<< bit_offset_in_byte<<endl;
         }
         output_bit_offset += bitset_len;
     }
-    if(output_bit_offset!=output_bitsize){
+    if(output_bit_offset!=encoded_bitsize){
         cout << "Error in output_bitsize"<<endl;
     }
-    cout<<output_buffer<<endl;
+}
 
+void HuffmanCompressor::generate_encoded_file_parallel(){
+//    cout<<"generate begin"<<endl;
+    encoded_bitsize = get_output_bitsize();
+    encoded_bytesize = encoded_bitsize/8+1;
+    cout<<"Target output bitsize = "<<encoded_bitsize<<endl;
+    encoded_data_buffer = new unsigned char[encoded_bytesize];
+    memset(encoded_data_buffer,0, encoded_bytesize);
+    uint32_t output_bit_offset = 0;
+
+    auto thread_output_ptr = new unsigned char*[threads_num];
+    auto thread_output_bitsize = new int[threads_num];
+
+    #pragma omp parallel num_threads(threads_num)
+    {
+        int tid = omp_get_thread_num();
+        uint32_t partition_size = rawdata_size / omp_get_num_threads();
+        uint32_t start_off = tid * partition_size;
+        uint32_t end_off = (tid == omp_get_num_threads() - 1) ? rawdata_size : start_off + partition_size;
+
+        uint32_t local_output_bitsize = get_local_output_bitsize(start_off, end_off);
+        thread_output_bitsize[tid] = local_output_bitsize;
+        uint32_t local_output_bytesize = local_output_bitsize/8 + 1;
+
+        usigned char* local_output_buffer = new unsigned char[local_output_bytesize];
+        thread_output_ptr[tid] = local_output_buffer;
+
+        uint32_t local_output_bit_offset = 0;
+        uint32_t byte_offset = 0, bit_offset_in_byte = 0;
+
+        for (uint32_t k = start_off; k < end_off; k++) {
+            int char_id = static_cast<int>(rawdata_buffer[k]);
+            huffmanBitSet cur_bitSet = char_code_map[char_id];
+            uint32_t bitset_len = cur_bitSet.length();
+            for (uint32_t i = 0; i < bitset_len; i++) {
+                // write to the output_buffer one bit by one bit
+                byte_offset = (i + local_output_bit_offset) / 8; // In which Byte of the output
+                bit_offset_in_byte = (i + local_output_bit_offset) % 8; // the bit offset in that byte
+                local_output_buffer[byte_offset] |= (cur_bitSet[i] << bit_offset_in_byte);
+            }
+            local_output_bit_offset += bitset_len;
+        }
+    }
+
+    if(threads_num==1){
+        memmove(encoded_data_buffer,thread_output_ptr[0],encoded_bytesize);
+    } else {
+        uint32_t all_byteoff = 0;
+        uint32_t all_bitoff = 0;
+        for(int t=0;t<threads_num;t++){
+            // move each partition together
+            uint32_t local_bitsize = thread_output_bitsize[t];
+            uint32_t local_bytesize = bitsize / 8;
+            if(all_bitoff % 8 != 0){
+                uint32_t left_bit_in_byte = 8 - all_bitoff % 8;
+                for(int j = 0;j<left_bit_in_byte;j++){
+                    encoded_data_buffer[all_byteoff] |= thread_output_ptr[t][0]
+                }
+
+
+            }
+
+        }
+
+    }
+
+
+
+    // sequential version that works
+    uint32_t byte_offset=0, bit_offset_in_byte=0;
+    for(uint32_t k = 0; k < rawdata_size;  k++) {
+        int char_id = static_cast<int>(rawdata_buffer[k]);
+        huffmanBitSet cur_bitSet = char_code_map[char_id];
+        uint32_t bitset_len = cur_bitSet.length();
+//        cout<<rawdata_buffer[k]<<" "<<char_strcode_map[char_id]<<" "<<bitset_len<<endl;
+        for (uint32_t i = 0; i < bitset_len; i++) {
+            // write to the output_buffer one bit by one bit
+            byte_offset = (i+output_bit_offset)/8; // In which Byte of the output
+            bit_offset_in_byte = (i+output_bit_offset)%8; // the bit offset in that byte
+            encoded_data_buffer[byte_offset] |= (static_cast<int>(cur_bitSet[i]) << bit_offset_in_byte);
+//            cout<<cur_bitSet[i]<<" "<<bit_offset_in_byte<<" "<< bit_offset_in_byte<<endl;
+        }
+        output_bit_offset += bitset_len;
+    }
+    if(output_bit_offset!=encoded_bitsize){
+        cout << "Error in output_bitsize"<<endl;
+    }
+}
+
+void HuffmanCompressor::output_encoded_file(){
     FILE* fp = fopen(output_filepath,"wb");
     if(fp== nullptr) {
         cout << "Error in open file " << output_filepath << endl;
     }
-
-    fwrite(output_buffer,sizeof(char),output_bytesize,fp);
+    if(encoded_data_buffer== nullptr){
+        cout << "Error that encoded data buffer is empty?" << endl;
+    }
+    fwrite(encoded_data_buffer,sizeof(char),encoded_bytesize,fp);
     fclose(fp);
-    encoded_bytesize = output_bytesize;
-    encoded_bitsize = output_bitsize;
-
-    delete[] output_buffer;
 }
 
 void HuffmanCompressor::output_encode_map(){
@@ -385,6 +484,11 @@ void HuffmanCompressor::decode(){
         rawdata_buffer[rawdata_off++]=static_cast<char>(cur_node->id);
     }
     if(rawdata_off!=rawdata_size){
+        unsigned char* new_rawdata_buffer = new unsigned char[rawdata_off+1];
+        memcpy(new_rawdata_buffer,rawdata_buffer,rawdata_off);
+        delete(rawdata_buffer);
+        rawdata_buffer = new_rawdata_buffer;
+        rawdata_size = rawdata_off;
         cout<<"Error that rawdata overflow: rawdata_off="<<rawdata_off<<" rawdata_size="<<rawdata_size<<endl;
     }
 }
@@ -433,22 +537,26 @@ void HuffmanCompressor::get_encoded_file(){
     compute_time = duration_cast<dsec>(Clock::now() - init_start).count();
     cout<<"*** read_raw_file time= "<<compute_time<<endl;
 
-    init_start = Clock::now();
+//    init_start = Clock::now();
     build_huffman_tree();
-    compute_time = duration_cast<dsec>(Clock::now() - init_start).count();
-    cout<<"*** build_huffman_tree time= "<<compute_time<<endl;
+//    compute_time = duration_cast<dsec>(Clock::now() - init_start).count();
+//    cout<<"*** build_huffman_tree time= "<<compute_time<<endl;
+
+//    init_start = Clock::now();
+    encode();
+//    compute_time = duration_cast<dsec>(Clock::now() - init_start).count();
+//    cout<<"*** encode time= "<<compute_time<<endl;
 
     init_start = Clock::now();
-    encode();
+    generate_encoded_file();
     compute_time = duration_cast<dsec>(Clock::now() - init_start).count();
-    cout<<"*** encode time= "<<compute_time<<endl;
+    cout<<"*** generate encoded file time= "<<compute_time<<endl;
 
     init_start = Clock::now();
     output_encoded_file();
+    output_encode_map();
     compute_time = duration_cast<dsec>(Clock::now() - init_start).count();
     cout<<"*** output time= "<<compute_time<<endl;
-
-    output_encode_map();
 }
 
 void HuffmanCompressor::get_decoded_file(){
