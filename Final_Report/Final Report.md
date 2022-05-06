@@ -192,15 +192,15 @@ So we identify the bottleneck of Huffman Coding as generate_encoded_file(), and 
 
 ##### **Parallel Strategy: Partition the file**
 
-As it is a compression task, our parallel design is to **partition the original file into different parts**, and assign each thread to work on one partition, then merge thread results to one result.
+As it is a compression task, our parallel design is to **partition the file into equal-size parts**, and assign each thread to work on one partition, then merge thread results to one result.
 
-- **Parallel Read_File & Count_Frequency**
+- **Parallel Read_File & Count_Frequency** (Input Time in below table)
 
   Each thread counts character frequency of one partition in the whole file, and then merge the result together.
 
   This is easy to implement since partition can be divided by bytes number. Se can tell each thread read from which byte and end with which byte.
 
-- **Parallel Generate_Compression**
+- **Parallel Generate_Compression** (Compression Time in below table)
 
   Each thread generate the compression of one partition using encoded char set, and output to a local buffer. After they finished, we will concatenate each local output to a global buffer.
 
@@ -238,33 +238,59 @@ Correctness is checked by md5sum and diff command.
 
 Compression ratio negligible for sequential and parallel results.
 
-| war&peace(32M)  |            |                  |                       |                   |               |
-| --------------- | ---------- | ---------------- | --------------------- | ----------------- | ------------- |
-| Algorithm       | Thread Num | Input Time (ms)  | Compression Time (ms) | Total Time (ms)   | Total Speedup |
-| Huffman         | 1          | 28.332           | 1658.56               | 1702.26           | 1.000         |
-|                 | 4          | 13.6374          | 667.689               | 696.701           | 2.443         |
-|                 | 8          | 11.8753          | 209.68                | 236.976           | 7.183         |
-|                 | 16         | 11.407           | 107.579               | 153.547           | 11.086        |
-|                 | 32         | 11.8537          | 57.2743               | 84.5705           | 20.128        |
-|                 | 64         | 23.626           | 46.0987               | 85.2528           | 19.967        |
-| Raw File Bytes: | 32022870   | Compressed Bytes | 17987649              | Compression Ratio | 1.78          |
-| Decode Time     | 616.528ms  |                  |                       |                   |               |
+| war&peace(32M)  |            |                  |                       |                   |                   |
+| --------------- | ---------- | ---------------- | --------------------- | ----------------- | ----------------- |
+| Algorithm       | Thread Num | Input Time (ms)  | Compression Time (ms) | Total Time (ms)   | **Total Speedup** |
+| Huffman         | 1          | 28.332           | 1658.56               | 1702.26           | 1.000             |
+|                 | 4          | 13.6374          | 667.689               | 696.701           | 2.443             |
+|                 | 8          | 11.8753          | 209.68                | 236.976           | 7.183             |
+|                 | 16         | 11.407           | 107.579               | 153.547           | 11.086            |
+|                 | 32         | 11.8537          | 57.2743               | 84.5705           | 20.128            |
+|                 | 64         | 23.626           | 46.0987               | 85.2528           | 19.967            |
+| Raw File Bytes: | 32022870   | Compressed Bytes | 17987649              | Compression Ratio | 1.78              |
+| Decode Time     | 616.528ms  |                  |                       |                   |                   |
 
-| angular.js(21M) |            |                  |                       |                   |               |
-| --------------- | ---------- | ---------------- | --------------------- | ----------------- | ------------- |
-| Algorithm       | Thread Num | Input Time (ms)  | Compression Time (ms) | Total Time (ms)   | Total Speedup |
-| Huffman         | 1          | 20.782           | 1037.930              | 1087.510          | 1.000         |
-|                 | 4          | 11.148           | 271.698               | 294.180           | 3.697         |
-|                 | 8          | 8.660            | 132.590               | 152.936           | 7.111         |
-|                 | 16         | 8.530            | 68.518                | 88.530            | 12.284        |
-|                 | 32         | 18.716           | 37.405                | 67.559            | 16.097        |
-|                 | 64         | 14.617           | 23.218                | 49.677            | 21.892        |
-| Raw File Bytes: | 22046527   | Compressed Bytes | 13294321              | Compression Ratio | 1.66          |
-| Decode Time     | 381.781 ms |                  |                       |                   |               |
+| angular.js(21M) |            |                  |                       |                   |                   |
+| --------------- | ---------- | ---------------- | --------------------- | ----------------- | ----------------- |
+| Algorithm       | Thread Num | Input Time (ms)  | Compression Time (ms) | Total Time (ms)   | **Total Speedup** |
+| Huffman         | 1          | 20.782           | 1037.930              | 1087.510          | 1.000             |
+|                 | 4          | 11.148           | 271.698               | 294.180           | 3.697             |
+|                 | 8          | 8.660            | 132.590               | 152.936           | 7.111             |
+|                 | 16         | 8.530            | 68.518                | 88.530            | 12.284            |
+|                 | 32         | 18.716           | 37.405                | 67.559            | 16.097            |
+|                 | 64         | 14.617           | 23.218                | 49.677            | 21.892            |
+| Raw File Bytes: | 22046527   | Compressed Bytes | 13294321              | Compression Ratio | 1.66              |
+| Decode Time     | 381.781 ms |                  |                       |                   |                   |
 
 
 
 #### Analysis
+
+Since the perfoamce decreases from thread_num=64, which indicates that more threads will hurt the performance, so we did not  conduct thread_num=128 test. 
+
+- **Speedup**
+
+  At first, with more threads, the speedup increases as expected. However, then the speedup does not have obvious change with the threads number. That's because of the **synchronization of merging results** between threads. In the end of the parallel execution, the program will merge each local results together, it must be sequential since we cannot mix the order of each partition. With more threads, it needs to calls more memcpy(), but each time it just copy a little part of the file.
+
+  The unbalanced workload is not the reason. Since each partition will have the similar number of characters, and that's even for each thread. 
+
+- **Two-part paralleism**
+
+  The implementation of Huffman Coding contains two parts of parallelism, and they have **differnt requirement for threads number**. For the first part, which is read_file and count_frequency (Input Time), when thread number = 4, it has an optimal speedup of 2.2. For the second part, which is generate_compression(Compress Time), when thread number = 8, it has an best speedup of 7.1. When thread number =32, the first part even has some overhead for total performance. In production environment, we can consider **set different threads number for each part** and get an **optimal combination performance**. 
+
+  
+
+#### Parallel in Huffman Family
+
+Huffman family’s implementation versus our simple one (e.g., 新huffman用了什么新技术/算法）- Xiong
+
+
+
+
+
+
+
+
 
 
 
@@ -393,19 +419,9 @@ T1/61 + t2/22, when m ~= 32
 
 
 
-Huffman analysis + parallel design, etc…	- Xiong
-
 Huffman family’s implementation versus our simple one (e.g., 新huffman用了什么新技术/算法）- Xiong
 
-Lz77 analysis + parallel design, etc…	- Qier
 
-Modern lz family’s implementation versus our simple one (e.g., lz4用了什么新技术/算法）- Qier
-
-Comparison between Huffman and lz77 - Qier
-
-Why NOT GPU? - Qier
-
-性能总结+zstd分析 – Qier
 
 
 
