@@ -230,7 +230,7 @@ Notice that `map_filepath` will store the encode map of each character, data siz
 
 Currently, the partition number is equal to thread number. The workload of each partition depends on how much characters in the partition, so partitioning by size will make sure that each thread are expected to have a similar work load and reduce the cost due to unbalance.
 
-### Result
+### Result and Analysis
 
 The records of benchmarking is shown below, with different type of original files.
 
@@ -263,7 +263,6 @@ Compression ratio negligible for sequential and parallel results.
 | Decode Time     | 381.781 ms |                  |                       |                   |                   |
 
 
-
 #### Analysis
 
 Since the perfoamce decreases from thread_num=64, which indicates that more threads will hurt the performance, so we did not  conduct thread_num=128 test. 
@@ -277,22 +276,6 @@ Since the perfoamce decreases from thread_num=64, which indicates that more thre
 - **Two-part paralleism**
 
   The implementation of Huffman Coding contains two parts of parallelism, and they have **differnt requirement for threads number**. For the first part, which is read_file and count_frequency (Input Time), when thread number = 4, it has an optimal speedup of 2.2. For the second part, which is generate_compression(Compress Time), when thread number = 8, it has an best speedup of 7.1. When thread number =32, the first part even has some overhead for total performance. In production environment, we can consider **set different threads number for each part** and get an **optimal combination performance**. 
-
-  
-
-#### Parallel in Huffman Family
-
-Huffman family’s implementation versus our simple one (e.g., 新huffman用了什么新技术/算法）- Xiong
-
-
-
-
-
-
-
-
-
-
 
 ### Comparison for Huffman vs. LZ77 and among different traces
 
@@ -361,7 +344,13 @@ In the tests we conducted, for general file (size 3MB ~ 30MB), the speedup stops
 
 ### Conclusion
 
-For a compression algorithm combine t1 time of Lempel-Ziv family encoding and t2 time of Entropy encoding of size m MB, the potential quickest duration is approximately:
+For a compression algorithm **combines** t1 time of Lempel-Ziv family (such as LZ77) encoding and t2 time of Entropy encoding (such as Huffman Coding) of size m MB, the potential quickest duration is the following:
+
+Sequential duration:
+
+t1 + t2
+
+Parallel duration (approximately):
 
 t1/28 + t2/14, when m ~= 3
 
@@ -370,62 +359,6 @@ t1/44 + t2/22, when m ～= 20
 T1/61 + t2/22, when m ~= 32
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
----------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Huffman family’s implementation versus our simple one (e.g., 新huffman用了什么新技术/算法）- Xiong
-
-
-
-
-
-### References
 
 
 
