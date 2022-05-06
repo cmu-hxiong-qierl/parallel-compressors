@@ -26,7 +26,7 @@ void HuffmanCompressor::read_encode_map(){
     fscanf(mapfile,"%s",line_ca);
     encode_thread_num = stoi(string(line_ca));
 
-    int line_size = encode_thread_num * 2 * 8;
+    int line_size = encode_thread_num * 2 * 10;
     char* bitsize_line = new char[line_size];
     fscanf(mapfile,"%s",bitsize_line);
     string str_bitsize = string(bitsize_line);
@@ -335,8 +335,6 @@ void HuffmanCompressor::decode(){
         rawdata_buffer[rawdata_off++]=static_cast<char>(cur_node->id);
     }
     if(rawdata_off!=rawdata_size){
-        cout<<"Error in rawdata: rawdata_off="<<rawdata_off<<" rawdata_size="<<rawdata_size<<endl;
-        rawdata_size = rawdata_off;
         unsigned char* new_rawdata_buffer = new unsigned char[rawdata_size+1];
         memcpy(new_rawdata_buffer,rawdata_buffer,rawdata_size);
         delete(rawdata_buffer);
@@ -385,7 +383,7 @@ void HuffmanCompressor::get_encoded_file(){
     init_hnode_array();
     read_raw_file(input_filepath);
     compute_time = duration_cast<dsec>(Clock::now() - init_start).count();
-    cout<<"[Input    Time]  "<<compute_time<<endl;
+    cout<<"[Input    Time]  "<<compute_time*1000<<endl;
 
     build_huffman_tree();
     encode();
@@ -393,13 +391,13 @@ void HuffmanCompressor::get_encoded_file(){
     init_start = Clock::now();
     generate_encoded_file_parallel();
     compute_time = duration_cast<dsec>(Clock::now() - init_start).count();
-    cout<<"[Compress Time]  "<<compute_time<<endl;
+    cout<<"[Compress Time]  "<<compute_time*1000<<endl;
 
     init_start = Clock::now();
     output_encoded_file();
     output_encode_map();
     compute_time = duration_cast<dsec>(Clock::now() - init_start).count();
-    cout<<"[Output   Time]  "<<compute_time<<endl;
+    cout<<"[Output   Time]  "<<compute_time*1000<<endl;
     cout<<"raw file size: "<<rawdata_size<<endl;
     cout<<"compressed file size: "<<encoded_bytesize<<endl;
 }

@@ -44,6 +44,6 @@ int main(int argc, char *argv[])
         return 0;
     }
     compute_time += duration_cast<dsec>(Clock::now() - init_start).count();
-    cout<<"[Total    Time]  "<<compute_time<<endl;
+    cout<<"[Total    Time]  "<<1000*compute_time<<endl;
     return 0;
 }
