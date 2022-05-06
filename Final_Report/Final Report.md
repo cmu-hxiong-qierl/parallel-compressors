@@ -247,7 +247,7 @@ Compression ratio negligible for sequential and parallel results.
 |                 | 16         | 11.407           | 107.579               | 153.547           | 11.086        |
 |                 | 32         | 11.8537          | 57.2743               | 84.5705           | 20.128        |
 |                 | 64         | 23.626           | 46.0987               | 85.2528           | 19.967        |
-| Raw File Bytes: | 32022870   | Compressed Bytes | 17987649              | Compression Ratio | 0.562         |
+| Raw File Bytes: | 32022870   | Compressed Bytes | 17987649              | Compression Ratio | 1.78          |
 | Decode Time     | 616.528ms  |                  |                       |                   |               |
 
 | angular.js(21M) |            |                  |                       |                   |               |
@@ -259,7 +259,7 @@ Compression ratio negligible for sequential and parallel results.
 |                 | 16         | 8.530            | 68.518                | 88.530            | 12.284        |
 |                 | 32         | 18.716           | 37.405                | 67.559            | 16.097        |
 |                 | 64         | 14.617           | 23.218                | 49.677            | 21.892        |
-| Raw File Bytes: | 22046527   | Compressed Bytes | 13294321              | Compression Ratio | 0.603         |
+| Raw File Bytes: | 22046527   | Compressed Bytes | 13294321              | Compression Ratio | 1.66          |
 | Decode Time     | 381.781 ms |                  |                       |                   |               |
 
 
@@ -342,6 +342,22 @@ t1/28 + t2/14, when m ~= 3
 t1/44 + t2/22, when m ～= 20
 
 T1/61 + t2/22, when m ~= 32
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
