@@ -34,36 +34,6 @@ The tests is run on PSC machines sequentially and parallelly from num_threads 1 
 
 
 
-### Huffman Coding
-
-| 10wap(32M) |                          |                                 |                       |                 |               |
-| ---------- | ------------------------ | ------------------------------- | --------------------- | --------------- | ------------- |
-| Algorithm  | Thread Num               | Input Time (ms)                 | Compression Time (ms) | Total Time (ms) | Total Speedup |
-| Huffman    | 1                        | 28.332                          | 1658.56               | 1702.26         | 1.000         |
-|            | 4                        | 13.6374                         | 667.689               | 696.701         | 2.443         |
-|            | 8                        | 11.8753                         | 209.68                | 236.976         | 7.183         |
-|            | 16                       | 11.407                          | 107.579               | 153.547         | 11.086        |
-|            | 32                       | 11.8537                         | 57.2743               | 84.5705         | 20.128        |
-|            | 64                       | 23.626                          | 46.0987               | 85.2528         | 19.967        |
-|            | Raw File Bytes: 32022870 | Compressed File Bytes: 17987649 |                       |                 |               |
-|            | Compression Ratio        | 0.562 (其实应该取倒数，1.779)   |                       |                 |               |
-|            | Decode Time              | 616.528ms                       |                       |                 |               |
-
-| angular.js (21M) |                         |                                |                       |                 |               |
-| ---------------- | ----------------------- | ------------------------------ | --------------------- | --------------- | ------------- |
-| Algorithm        | Thread Num              | Input Time (ms)                | Compression Time (ms) | Total Time (ms) | Total Speedup |
-| Huffman          | 1                       | 20.782                         | 1037.930              | 1087.510        | 1.000         |
-|                  | 4                       | 11.148                         | 271.698               | 294.180         | 3.697         |
-|                  | 8                       | 8.660                          | 132.590               | 152.936         | 7.111         |
-|                  | 16                      | 8.530                          | 68.518                | 88.530          | 12.284        |
-|                  | 32                      | 18.716                         | 37.405                | 67.559          | 16.097        |
-|                  | 64                      | 14.617                         | 23.218                | 49.677          | 21.892        |
-|                  | Raw File Bytes 22046527 | Compressed File Bytes:13294321 |                       |                 |               |
-|                  | Compression Ratio       | 0.603(1.658)                   |                       |                 |               |
-|                  | Decode Time             | 381.781 ms                     |                       |                 |               |
-
-
-
 ### LZ77
 
 #### Intro
@@ -198,7 +168,7 @@ The basic steps of Huffman Coding is:
 - Generate Compression for the file with encoded character
 - Output compressed file
 
-// 流程图
+
 
 The most important part is building Huffman Tree, here is an example of the algorithm.
 
@@ -306,11 +276,8 @@ The speedups for each algorithm on 3 main test traces are shown below:
 
 <img src="text_small.jpg" alt="text_small" style="zoom:50%;" />
 
-<<<<<<< HEAD
 <img src="text_big.png" alt="截屏2022-05-05 下午7.42.15" style="zoom:50%;" />
-=======
-<img src="text_big.png" alt="text_big" style="zoom:50%;">
->>>>>>> a04e552 (Merge)
+
 <img src="source_code.jpg" alt="source_code" style="zoom:50%;" />
 
 It could be concluded:
