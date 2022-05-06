@@ -73,7 +73,6 @@ int main(int argc, char *argv[]) {
             int original_size;
             fread(&num_threads, sizeof(int), 1, input);
             fread(&original_size, sizeof(int), 1, input);
-            printf("original_size: %d\n", original_size);
             int size_local = original_size / num_threads;
             int size_last = original_size - size_local * (num_threads - 1);
             
@@ -84,7 +83,6 @@ int main(int argc, char *argv[]) {
             for (int i = 0; i < num_threads; i++) {
                 int partition_size;
                 fread(&partition_size, sizeof(int), 1, input);
-                printf("partition %d size: %d\n", i, partition_size);
                 unsigned char* compressed = (unsigned char*)malloc(partition_size + sizeof(int) * 2);
                 if (i == num_threads - 1) {
                     *(int *)compressed = size_last;
@@ -94,7 +92,6 @@ int main(int argc, char *argv[]) {
                 fread(compressed + sizeof(int), partition_size, 1, input);
                 unsigned char** original = (unsigned char**)malloc(sizeof(unsigned char**));
                 long original_size_t = lz77_uncompress(compressed, original);
-                printf("partition %d original size: %ld\n", i, original_size_t);
                 fwrite(*original, original_size_t, 1, output);
                 delete compressed;
                 delete *original;
@@ -157,7 +154,6 @@ int main(int argc, char *argv[]) {
 
             printf("Total time: %.3f ms\n", 1000.f * (end_time - start_time));
             printf("Compress time: %.3f ms\n", 1000.f * (compress_end_time - compress_start_time));
-            fclose(input);
             fclose(output);
         }
     }
